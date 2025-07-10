@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+import { useRouter } from "next/navigation"
 
 import { useState, useEffect } from "react"
 import {
@@ -99,7 +100,9 @@ interface ApiResponse {
 }
 
 export default function PajakPage() {
-  const { userEmail } = useAuth()
+  const { userEmail, logout } = useAuth()
+  const router = useRouter()
+
   const [searchQuery, setSearchQuery] = useState("")
   const [perPage, setPerPage] = useState("10")
   const [currentPage, setCurrentPage] = useState(1)
@@ -387,8 +390,9 @@ export default function PajakPage() {
     }
   }
 
-  const handleLogout = () => {
-    console.log("User logged out")
+  const handleLogout = async () => {
+    await logout() // Pastikan ini membersihkan token/session
+    router.push("/login") // Redirect ke halaman login
   }
 
   return (

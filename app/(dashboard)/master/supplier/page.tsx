@@ -205,16 +205,7 @@ export default function SupplierPage() {
     try {
       const selectedIds = suppliers.filter((supplier) => supplier.selected).map((supplier) => supplier.id)
 
-      // For development, just filter out the selected suppliers
-      if (process.env.NODE_ENV === "development") {
-        const updatedSuppliers = suppliers.filter((supplier) => !supplier.selected)
-        setSuppliers(updatedSuppliers)
-        setFilteredSuppliers(updatedSuppliers)
-        setShowDeleteDialog(false)
-        return
-      }
-
-      // If multiple suppliers are selected, we need to make multiple API calls
+      // Hapus blok development, selalu gunakan API
       for (const id of selectedIds) {
         await api.delete(`/v1/app/suppliers/${id}`)
       }

@@ -719,9 +719,9 @@ export default function UserPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-100">
-      <Sidebar />
-      <div className="flex-1">
+    <div className="flex h-screen bg-gray-100">
+      <Sidebar className="h-screen hidden md:block" />
+      <div className="flex-1 w-full">
         <header className="flex items-center justify-between bg-white px-6 py-4 shadow-sm">
           <h1 className="text-2xl font-semibold"></h1>
           <div className="flex items-center gap-4">

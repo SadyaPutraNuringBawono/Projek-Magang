@@ -488,8 +488,8 @@ export default function CustomerPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-100">
-      <Sidebar className="hidden md:block" />
+    <div className="flex h-screen bg-gray-100"> {/* Ganti min-h-screen jadi h-screen */}
+      <Sidebar className="h-screen hidden md:block" /> {/* Tambahkan h-screen */}
       <div className="flex-1 w-full">
         <header className="flex flex-col md:flex-row items-start md:items-center justify-between bg-white px-4 md:px-6 py-4 shadow-sm gap-2">
           <div className="flex-1 min-w-0">

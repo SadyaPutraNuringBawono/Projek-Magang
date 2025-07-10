@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+import { useRouter } from "next/navigation"
 
 import { useState, useEffect } from "react"
 import { Pencil, X, ChevronLeft, Search, Trash2, AlertCircle, Plus, Bell, ChevronDown, LogOut, Menu } from "lucide-react"
@@ -66,7 +67,14 @@ interface ApiResponse {
 }
 
 export default function BrandPage() {
-  const { userEmail } = useAuth()
+  const { userEmail, logout } = useAuth()
+  const router = useRouter()
+
+  const handleLogout = async () => {
+    await logout() // Pastikan ini membersihkan token/session
+    router.push("/login") // Redirect ke halaman login
+  }
+
   const { notification, showSuccess, hideSuccess } = useSuccessNotification()
   const [searchQuery, setSearchQuery] = useState("")
   const [perPage, setPerPage] = useState("10")
@@ -345,10 +353,6 @@ export default function BrandPage() {
       setCurrentPage(page)
     }
   }
-
-  const handleLogout = () => {
-    console.log("User logged out");
-  };
 
   return (
     <div className="flex min-h-screen bg-gray-100">
