@@ -28,7 +28,6 @@ const menuItems: MenuItem[] = [
       { name: "Kategori", link: "/master/kategori" },
       { name: "Brand / Merk", link: "/master/brand" },
       { name: "Satuan", link: "/master/satuan" },
-      { name: "Manajemen Stok", link: "/master/stok" },
       { name: "Pelanggan", link: "/master/pelanggan" },
       { name: "Supplier", link: "/master/supplier" },
       {
@@ -40,8 +39,6 @@ const menuItems: MenuItem[] = [
           { name: "Modul Biaya", link: "/master/biaya" },
         ],
       },
-      { name: "Stok Opname", link: "/master/stok-opname" },
-      { name: "Transfer Stok", link: "/master/transfer-stok" },
     ],
   },
   {
@@ -50,9 +47,6 @@ const menuItems: MenuItem[] = [
       { name: "Toko", link: "/pengaturan/toko" },
       { name: "Cabang / Pusat", link: "/pengaturan/cabang" },
       { name: "Manajemen Staff", link: "/pengaturan/staff" },
-      { name: "Lain - Lain", link: "/pengaturan/lain-lain" },
-      { name: "Ukuran Kertas", link: "/pengaturan/kertas" },
-      { name: "Struk", link: "/pengaturan/struk" },
     ],
   },
 ]
@@ -61,6 +55,19 @@ export function Sidebar() {
   const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set())
   const [expandedSubMenus, setExpandedSubMenus] = useState<Set<string>>(new Set())
   const pathname = usePathname()
+
+  // Tambahkan fungsi untuk cek apakah submenu aktif
+  const isMenuActive = (item: MenuItem) => {
+    if (item.link && pathname === item.link) return true
+    if (item.items) {
+      return item.items.some(
+        (sub) =>
+          pathname === sub.link ||
+          (sub.subItems && sub.subItems.some((nested) => pathname === nested.link))
+      )
+    }
+    return false
+  }
 
   const toggleMenu = (label: string) => {
     setExpandedMenus((prev) => {
@@ -105,7 +112,7 @@ export function Sidebar() {
               className={cn(
                 "w-full justify-between text-white hover:bg-green-800 hover:text-white",
                 item.label === "DASHBOARD" && pathname === "/" && "bg-green-700",
-                item.items && pathname.includes(item.label.toLowerCase()) && "bg-green-700",
+                isMenuActive(item) && "bg-green-700",
                 expandedMenus.has(item.label) && item.items && "bg-green-800",
               )}
               onClick={() => item.items && toggleMenu(item.label)}
@@ -125,7 +132,8 @@ export function Sidebar() {
               )}
             </Button>
 
-            {item.items && expandedMenus.has(item.label) && (
+            {/* Expand menu jika aktif atau sudah di-expand manual */}
+            {item.items && (expandedMenus.has(item.label) || isMenuActive(item)) && (
               <div className="mt-1 space-y-1 pl-4">
                 {item.items.map((subItem) => (
                   <div key={subItem.name}>
