@@ -487,17 +487,36 @@ export default function CustomerPage() {
     }
   }
 
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+
   return (
-    <div className="flex h-screen bg-gray-100">
-      <Sidebar className="h-screen hidden md:block" />
-      <div className="flex-1 w-full flex flex-col">
-        <header className="flex flex-col md:flex-row items-start md:items-center justify-between bg-white px-4 md:px-6 py-4 shadow-sm gap-2">
-          <div className="flex-1 min-w-0">
-            <h1 className="text-2xl font-semibold">Pelanggan</h1>
-            <p className="text-xs md:text-sm text-gray-500">Master - Pelanggan</p>
-          </div>
+    <div className="flex min-h-screen bg-gray-100">
+      {/* Sidebar */}
+      <div className={`fixed inset-y-0 left-0 z-40 w-64 bg-[#00A651] overflow-y-auto transform transition-transform duration-200 ease-in-out lg:relative lg:transform-none ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} flex flex-col`}>
+        <Sidebar />
+      </div>
+      {/* Overlay for mobile sidebar */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Main Content */}
+      <div className="flex-1 min-w-0 flex flex-col">
+        <header className="sticky top-0 z-20 flex items-center justify-between bg-white px-4 py-4 shadow-sm lg:px-6">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon">
+            <button
+              className="p-2 rounded-md lg:hidden"
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+            >
+              <Menu className="h-6 w-6" />
+            </button>
+            <h1 className="text-xl font-semibold hidden sm:block">Pelanggan</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" className="hidden sm:flex">
               <Bell className="h-5 w-5" />
             </Button>
             <DropdownMenu>
@@ -506,7 +525,12 @@ export default function CustomerPage() {
                   <Avatar className="h-8 w-8">
                     <AvatarFallback>{userEmail ? userEmail[0].toUpperCase() : "U"}</AvatarFallback>
                   </Avatar>
-                  <span className="hidden md:inline">{userEmail ? userEmail.split("@")[0] : "User"}</span>
+                  <div className="hidden sm:flex flex-col items-start">
+                    <span className="text-sm font-medium">
+                      {userEmail ? userEmail.split("@")[0] : "User"}
+                    </span>
+                    <span className="text-xs text-gray-500">{userEmail}</span>
+                  </div>
                   <ChevronDown className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -525,7 +549,7 @@ export default function CustomerPage() {
           </div>
         </header>
 
-        <main className="flex-1 p-2 md:p-6">
+        <main className="flex-1 p-2 md:p-6 overflow-x-auto">
           <div className="mb-4">
             <h2 className="text-lg md:text-xl font-semibold">Pelanggan</h2>
             <p className="text-xs md:text-sm text-gray-500">Master - Pelanggan</p>
@@ -553,7 +577,7 @@ export default function CustomerPage() {
                 </Select>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
                 <div className="relative w-full sm:w-auto">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                   <Input
@@ -765,7 +789,7 @@ export default function CustomerPage() {
 
       {/* Add Customer Dialog */}
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent className="max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-full sm:max-w-md w-full max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Tambah Pelanggan</DialogTitle>
           </DialogHeader>
@@ -943,7 +967,7 @@ export default function CustomerPage() {
 
       {/* Edit Customer Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-full sm:max-w-md w-full max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Pelanggan</DialogTitle>
           </DialogHeader>
