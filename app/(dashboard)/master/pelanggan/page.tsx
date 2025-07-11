@@ -488,12 +488,13 @@ export default function CustomerPage() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-100"> {/* Ganti min-h-screen jadi h-screen */}
-      <Sidebar className="h-screen hidden md:block" /> {/* Tambahkan h-screen */}
-      <div className="flex-1 w-full">
+    <div className="flex h-screen bg-gray-100">
+      <Sidebar className="h-screen hidden md:block" />
+      <div className="flex-1 w-full flex flex-col">
         <header className="flex flex-col md:flex-row items-start md:items-center justify-between bg-white px-4 md:px-6 py-4 shadow-sm gap-2">
           <div className="flex-1 min-w-0">
-            <h1 className="text-2xl font-semibold"></h1>
+            <h1 className="text-2xl font-semibold">Pelanggan</h1>
+            <p className="text-xs md:text-sm text-gray-500">Master - Pelanggan</p>
           </div>
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon">
@@ -505,7 +506,7 @@ export default function CustomerPage() {
                   <Avatar className="h-8 w-8">
                     <AvatarFallback>{userEmail ? userEmail[0].toUpperCase() : "U"}</AvatarFallback>
                   </Avatar>
-                  <span>{userEmail ? userEmail.split("@")[0] : "User"}</span>
+                  <span className="hidden md:inline">{userEmail ? userEmail.split("@")[0] : "User"}</span>
                   <ChevronDown className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -524,7 +525,7 @@ export default function CustomerPage() {
           </div>
         </header>
 
-        <main className="p-2 md:p-6">
+        <main className="flex-1 p-2 md:p-6">
           <div className="mb-4">
             <h2 className="text-lg md:text-xl font-semibold">Pelanggan</h2>
             <p className="text-xs md:text-sm text-gray-500">Master - Pelanggan</p>
@@ -552,13 +553,13 @@ export default function CustomerPage() {
                 </Select>
               </div>
 
-              <div className="flex items-center gap-2">
-                <div className="relative">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative w-full sm:w-auto">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                   <Input
                     type="search"
                     placeholder="Search"
-                    className="w-64 pl-9"
+                    className="w-full sm:w-64 pl-9"
                     value={searchQuery}
                     onChange={(e) => {
                       setSearchQuery(e.target.value)
@@ -587,12 +588,15 @@ export default function CustomerPage() {
                     onClick={() => setShowDeleteDialog(true)}
                   >
                     <Trash2 className="h-4 w-4" />
-                    Hapus terpilih
+                    <span className="hidden sm:inline">Hapus terpilih</span>
+                    <span className="sm:hidden">Hapus</span>
                   </Button>
                 )}
 
                 <Button className="bg-green-600 hover:bg-green-700" onClick={handleOpenAddDialog}>
-                  <Plus className="mr-1 h-4 w-4" /> Buat Baru
+                  <Plus className="mr-1 h-4 w-4" />
+                  <span className="hidden sm:inline">Buat Baru</span>
+                  <span className="sm:hidden">Tambah</span>
                 </Button>
               </div>
             </div>
@@ -687,12 +691,13 @@ export default function CustomerPage() {
               </Table>
             </div>
 
+            {/* Pagination */}
             {paginationMeta && (
-              <div className="mt-4 flex items-center justify-between">
+              <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-2">
                 <div className="text-sm text-gray-500">
                   Page {paginationMeta.from} to {paginationMeta.to} of {paginationMeta.total} entries
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 flex-wrap">
                   <Button
                     variant="outline"
                     size="sm"
@@ -701,7 +706,6 @@ export default function CustomerPage() {
                   >
                     Previous
                   </Button>
-
                   {Array.from({ length: Math.min(3, paginationMeta.last_page) }, (_, i) => i + 1).map((page) => (
                     <Button
                       key={page}
@@ -713,7 +717,6 @@ export default function CustomerPage() {
                       {page}
                     </Button>
                   ))}
-
                   {paginationMeta.last_page > 3 && (
                     <Button
                       variant={currentPage === 2 ? "default" : "outline"}
@@ -724,7 +727,6 @@ export default function CustomerPage() {
                       2
                     </Button>
                   )}
-
                   <Button
                     variant="outline"
                     size="sm"
