@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect } from "react"
-import { Pencil, X, Search, Trash2, AlertCircle, Plus, Eye, Bell, ChevronDown, LogOut } from "lucide-react"
+import { Pencil, X, Search, Trash2, AlertCircle, Plus, Eye, Bell, ChevronDown, LogOut, Menu } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -25,9 +25,8 @@ import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useRouter } from "next/navigation"
 import api from "@/lib/api"
-import { CheckCircle } from "lucide-react"
+import { useSuccessNotification, SuccessNotification } from "@/components/success-notification"
 
-// Update the Customer interface to match the API response
 interface Customer {
   id: number
   code: string
@@ -71,9 +70,10 @@ interface ApiResponse {
   meta?: PaginationMeta
 }
 
-export default function CustomerPage() {
+export default function CustomerPage(): React.JSX.Element {
   const { userEmail, logout } = useAuth()
   const router = useRouter()
+  const { notification, showSuccess, hideSuccess } = useSuccessNotification()
   const [searchQuery, setSearchQuery] = useState("")
   const [perPage, setPerPage] = useState("10")
   const [currentPage, setCurrentPage] = useState(1)
@@ -109,15 +109,6 @@ export default function CustomerPage() {
   const [addressError, setAddressError] = useState("")
   const [notesError, setNotesError] = useState("")
 
-  // Tambahkan state untuk foto, email, address, notes pada edit
-  const [editCustomerPhoto, setEditCustomerPhoto] = useState<File | null>(null)
-  const [editCustomerEmail, setEditCustomerEmail] = useState("")
-  const [editCustomerAddress, setEditCustomerAddress] = useState("")
-  const [editCustomerNotes, setEditCustomerNotes] = useState("")
-
-  // Tambahkan state untuk pop up sukses
-  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
-  const [successMessage, setSuccessMessage] = useState("")
 
   // Fetch customers from API
   const fetchCustomers = async () => {
@@ -143,6 +134,7 @@ export default function CustomerPage() {
         },
       })
 
+
       const customersWithSelection = response.data.data.map((customer) => ({
         ...customer,
         selected: false,
@@ -155,21 +147,38 @@ export default function CustomerPage() {
         setPaginationMeta(response.data.meta)
       }
     } catch (err: any) {
-      console.error("Error fetching customers:", err)
       setError(err.response?.data?.message || "Failed to fetch customers")
     } finally {
       setLoading(false)
     }
   }
 
+  // Fetch all customers for the import dialog
+  const fetchAllCustomers = async () => {
+    const auth = JSON.parse(localStorage.getItem("auth") || "{}")
+    const companyId = auth.companyId || 3
+    const response = await api.get(`${process.env.BASE_URL}/v1/app/customers/all`, {
+      params: { company_id: companyId }
+    })
+    // ...proses data...
+  }
+
+  // Fetch customer detail
+  const fetchCustomerDetail = async (id: number) => {
+    const response = await api.get(`/v1/app/customers/${id}`)
+    // ...proses data...
+  }
+
   useEffect(() => {
     fetchCustomers()
   }, [currentPage, perPage, searchQuery])
 
+  // Function to toggle selection of all customers
   const toggleSelectAll = () => {
     const allSelected = filteredCustomers.every((customer) => customer.selected)
     setCustomers(
       customers.map((customer) => {
+        // Only toggle customers that are in the filtered list
         if (filteredCustomers.some((fs) => fs.id === customer.id)) {
           return { ...customer, selected: !allSelected }
         }
@@ -184,6 +193,7 @@ export default function CustomerPage() {
     )
   }
 
+  // Function to toggle selection of a single customer
   const toggleSelectCustomer = (id: number) => {
     setCustomers(
       customers.map((customer) => (customer.id === id ? { ...customer, selected: !customer.selected } : customer)),
@@ -195,69 +205,77 @@ export default function CustomerPage() {
     )
   }
 
+  // Function to delete selected customers
   const deleteSelected = async () => {
     try {
       const selectedIds = customers.filter((customer) => customer.selected).map((customer) => customer.id)
 
-      // Hapus data di backend lewat API
+      // Hapus blok development, selalu gunakan API
       for (const id of selectedIds) {
         await api.delete(`/v1/app/customers/${id}`)
       }
 
-      // Setelah berhasil hapus di backend, fetch ulang data dari backend
+      // Refresh the customers list
       fetchCustomers()
       setShowDeleteDialog(false)
-      setSuccessMessage("Pelanggan Berhasil Dihapus")
-      setShowSuccessDialog(true)
+
+      // Show success notification
+      showSuccess(
+        "Berhasil menghapus data pelanggan", 
+        "Data pelanggan telah dihapus"
+      )
     } catch (err: any) {
       setError(err.response?.data?.message || "Failed to delete customers")
       console.error("Error deleting customers:", err)
     }
   }
 
+  // Function to add a new customer
   const addCustomer = async () => {
     try {
+      // Validate required fields
       let hasError = false
       if (!newCustomerName.trim()) {
-        setNameError("Nama customer tidak boleh kosong")
+        setNameError("Nama pelanggan tidak boleh kosong")
         hasError = true
       }
       if (!newCustomerCode.trim()) {
-        setCodeError("Kode customer tidak boleh kosong")
+        setCodeError("Kode pelanggan tidak boleh kosong")
         hasError = true
       }
       if (!newCustomerPhone.trim()) {
         setPhoneError("Nomor HP tidak boleh kosong")
         hasError = true
       }
-      // Hapus validasi wajib untuk address dan notes
-      // if (!newCustomerAddress.trim()) {
-      //   setAddressError("Alamat tidak boleh kosong")
-      //   hasError = true
-      // }
-      // if (!newCustomerNotes.trim()) {
-      //   setNotesError("Keterangan tidak boleh kosong")
-      //   hasError = true
-      // }
+      if (!newCustomerAddress.trim()) {
+        setAddressError("Alamat tidak boleh kosong")
+        hasError = true
+      }
+      if (!newCustomerNotes.trim()) {
+        setNotesError("Keterangan tidak boleh kosong")
+        hasError = true
+      }
 
       if (hasError) return
 
       const auth = JSON.parse(localStorage.getItem("auth") || "{}")
       const companyId = auth.companyId
-      const outletId = auth.outletId
+      const outletId = auth.outletId // Ambil outlet_id dari auth
 
       if (!companyId || !outletId) {
         setError("Company ID or Outlet ID not found. Please log in again.")
         return
       }
 
+      // Create FormData object
       const formData = new FormData()
       formData.append("company_id", companyId.toString())
-      formData.append("outlet_id", outletId.toString())
+      formData.append("outlet_id", outletId.toString()) // Tambahkan outlet_id
       formData.append("code", newCustomerCode.trim())
       formData.append("name", newCustomerName.trim())
       formData.append("phone", newCustomerPhone.trim())
-
+      
+      // Optional fields
       if (newCustomerEmail) {
         formData.append("email", newCustomerEmail.trim())
       }
@@ -271,13 +289,27 @@ export default function CustomerPage() {
         formData.append("notes", newCustomerNotes.trim())
       }
 
-      const response = await api.post("/v1/app/customers", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
+      // Log data untuk debugging
+      console.log("Sending data:", {
+        company_id: companyId,
+        outlet_id: outletId,
+        code: newCustomerCode,
+        name: newCustomerName,
+        phone: newCustomerPhone,
+        email: newCustomerEmail,
+        address: newCustomerAddress,
+        notes: newCustomerNotes,
+        hasPhoto: !!newCustomerPhoto
       })
 
+      // Make API request
+      const response = await api.post("/v1/app/customers", formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      })
+
+      // Check response
       if (response.status === 200 || response.status === 201) {
+        // Reset form
         setNewCustomerName("")
         setNewCustomerCode("")
         setNewCustomerPhone("")
@@ -287,66 +319,59 @@ export default function CustomerPage() {
         setNewCustomerNotes("")
         setShowAddDialog(false)
 
+        // Refresh customer list
         fetchCustomers()
 
+        // Clear any existing errors
         setNameError("")
         setCodeError("")
         setPhoneError("")
         setEmailError("")
         setPhotoError("")
         setError("")
+
+        // Show success notification
+        showSuccess(
+          "Berhasil menambahkan data pelanggan", 
+          "Data pelanggan baru telah ditambahkan"
+        )
       }
     } catch (err: any) {
       console.error("Error adding customer:", err)
+      console.error("Error response:", err.response?.data)
+
+      // Handle validation errors
       if (err.response?.data?.errors) {
         const apiErrors = err.response.data.errors
+        
+        // Set specific field errors
         if (apiErrors.name) setNameError(apiErrors.name[0])
         if (apiErrors.code) setCodeError(apiErrors.code[0])
         if (apiErrors.phone) setPhoneError(apiErrors.phone[0])
         if (apiErrors.email) setEmailError(apiErrors.email[0])
         if (apiErrors.photo) setPhotoError(apiErrors.photo[0])
       } else {
+        // Set general error message
         setError(err.response?.data?.message || "Failed to add customer")
       }
     }
   }
 
-  const handleOpenAddDialog = () => {
-    setNewCustomerName("")
-    setNewCustomerCode("")
-    setNewCustomerPhone("")
-    setNameError("")
-    setCodeError("")
-    setPhoneError("")
-    setShowAddDialog(true)
-  }
-
-  const handleOpenEditDialog = (customer: Customer) => {
-    setEditCustomerId(customer.id)
-    setEditCustomerName(customer.name)
-    setEditCustomerCode(customer.code)
-    setEditCustomerPhone(customer.phone)
-    setEditCustomerEmail(customer.email || "")
-    setEditCustomerAddress(customer.address || "")
-    setEditCustomerNotes(customer.notes || "")
-    setEditCustomerPhoto(null)
-    setEditNameError("")
-    setEditCodeError("")
-    setEditPhoneError("")
-    setShowEditDialog(true)
-  }
-
+  // Function to edit a customer
   const editCustomer = async () => {
+    // Validate customer name, code, and phone
     let hasError = false
 
     if (!editCustomerName.trim()) {
-      setEditNameError("Nama customer tidak boleh kosong")
+      setEditNameError("Nama pelanggan tidak boleh kosong")
       hasError = true
     }
+
     if (!editCustomerCode.trim()) {
-      setEditCodeError("Kode customer tidak boleh kosong")
+      setEditCodeError("Kode pelanggan tidak boleh kosong")
       hasError = true
     }
+
     if (hasError || !editCustomerId) return
 
     try {
@@ -358,52 +383,45 @@ export default function CustomerPage() {
         return
       }
 
-      const formData = new FormData()
-      formData.append("company_id", companyId)
-      formData.append("code", editCustomerCode.trim())
-      formData.append("name", editCustomerName.trim())
-      formData.append("phone", editCustomerPhone.trim())
-      formData.append("email", editCustomerEmail.trim())
-      formData.append("address", editCustomerAddress.trim())
-      formData.append("notes", editCustomerNotes.trim())
-      if (editCustomerPhoto) {
-        formData.append("photo", editCustomerPhoto)
-      }
-
-      await api.post(`/v1/app/customers/${editCustomerId}`, formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
+      await api.post(`/v1/app/customers/${editCustomerId}`, {
+        company_id: companyId,
+        code: editCustomerCode.trim(),
+        name: editCustomerName.trim(),
+        phone: editCustomerPhone.trim(),
       })
 
+      // Reset form and close dialog
       setEditCustomerName("")
       setEditCustomerCode("")
       setEditCustomerPhone("")
-      setEditCustomerEmail("")
-      setEditCustomerAddress("")
-      setEditCustomerNotes("")
-      setEditCustomerPhoto(null)
       setEditCustomerId(null)
       setEditNameError("")
       setEditCodeError("")
       setEditPhoneError("")
       setShowEditDialog(false)
 
+      // Refresh the customers list
       fetchCustomers()
-      setSuccessMessage("Pelanggan Berhasil Diperbarui")
-      setShowSuccessDialog(true)
+
+      // Show success notification
+      showSuccess(
+        "Berhasil mengubah data pelanggan", 
+        "Data pelanggan telah diperbarui"
+      )
     } catch (err: any) {
       setError(err.response?.data?.message || "Failed to update customer")
       console.error("Error updating customer:", err)
     }
   }
 
+  // Function to handle file selection
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       setSelectedFile(e.target.files[0])
     }
   }
 
+  // Function to handle import
   const handleImport = async () => {
     if (!selectedFile) {
       setError("No file selected.")
@@ -423,13 +441,14 @@ export default function CustomerPage() {
       formData.append("file", selectedFile)
 
       await api.post("/v1/app/customers/import", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
+        headers: { "Content-Type": "multipart/form-data" }
       })
 
+      // Reset form and close dialog
       setSelectedFile(null)
       setShowImportDialog(false)
+
+      // Refresh the customers list
       fetchCustomers()
     } catch (err: any) {
       setError(err.response?.data?.message || "Failed to import customers")
@@ -437,18 +456,22 @@ export default function CustomerPage() {
     }
   }
 
+  // Function to download template
   const downloadTemplate = async () => {
     try {
       const response = await api.get("/v1/app/customers/template", {
         responseType: "blob",
       })
 
+      // Create a download link
       const url = window.URL.createObjectURL(new Blob([response.data]))
       const link = document.createElement("a")
       link.href = url
       link.setAttribute("download", "customer_template.xlsx")
       document.body.appendChild(link)
       link.click()
+
+      // Clean up
       window.URL.revokeObjectURL(url)
       document.body.removeChild(link)
     } catch (err: any) {
@@ -457,30 +480,68 @@ export default function CustomerPage() {
     }
   }
 
+  // Handle opening the add dialog
+  const handleOpenAddDialog = () => {
+    setNewCustomerName("")
+    setNewCustomerCode("")
+    setNewCustomerPhone("")
+    setNameError("")
+    setCodeError("")
+    setPhoneError("")
+    setShowAddDialog(true)
+  }
+
+  // Handle opening the edit dialog
+  const handleOpenEditDialog = (customer: Customer) => {
+    setEditCustomerId(customer.id)
+    setEditCustomerName(customer.name)
+    setEditCustomerCode(customer.code)
+    setEditCustomerPhone(customer.phone)
+    setEditNameError("")
+    setEditCodeError("")
+    setEditPhoneError("")
+    setShowEditDialog(true)
+  }
+
+  // Handle viewing customer details
   const handleViewCustomer = (customerId: number) => {
     router.push(`/master/pelanggan/${customerId}`)
   }
 
+  // Handle opening the import dialog
+  const handleOpenImportDialog = () => {
+    setSelectedFile(null)
+    setShowImportDialog(true)
+  }
+
+  // Handle logout
   const handleLogout = () => {
     logout()
     router.replace("/login")
   }
 
+  // Check if all filtered customers are selected
   const allSelected = filteredCustomers.length > 0 && filteredCustomers.every((customer) => customer.selected)
+
+  // Check if any customer is selected
   const anySelected = customers.some((customer) => customer.selected)
+
+  // Get selected customers
   const selectedCustomers = customers.filter((customer) => customer.selected)
 
+  // Get confirmation message based on selection
   const getConfirmationMessage = () => {
     if (allSelected) {
       return "Apakah Anda yakin ingin menghapus yang terpilih?"
     } else if (selectedCustomers.length === 1) {
-      return `Apakah Anda yakin ingin menghapus customer "${selectedCustomers[0].name}"?`
+      return `Apakah Anda yakin ingin menghapus pelanggan "${selectedCustomers[0].name}"?`
     } else {
       const customerNames = selectedCustomers.map((customer) => customer.name).join('", "')
-      return `Apakah Anda yakin ingin menghapus customer "${customerNames}"?`
+      return `Apakah Anda yakin ingin menghapus pelanggan "${customerNames}"?`
     }
   }
 
+  // Handle page change
   const handlePageChange = (page: number) => {
     if (paginationMeta && page > 0 && page <= paginationMeta.last_page) {
       setCurrentPage(page)
@@ -491,20 +552,26 @@ export default function CustomerPage() {
 
   return (
     <div className="flex min-h-screen bg-gray-100">
-      {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-40 w-64 bg-[#00A651] overflow-y-auto transform transition-transform duration-200 ease-in-out lg:relative lg:transform-none ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} flex flex-col`}>
-        <Sidebar />
-      </div>
-      {/* Overlay for mobile sidebar */}
+      {/* Overlay for mobile when sidebar is open */}
       {sidebarOpen && (
-        <div
+        <div 
           className="fixed inset-0 bg-black/50 z-30 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
+      {/* Sidebar */}
+      <div className={`
+        fixed inset-y-0 left-0 z-40 w-64 bg-[#00A651] transform transition-transform duration-200 ease-in-out lg:relative lg:transform-none flex flex-col
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+      `}>
+        <div className="overflow-y-auto flex-1">
+          <Sidebar />
+        </div>
+      </div>
+
       {/* Main Content */}
-      <div className="flex-1 min-w-0 flex flex-col">
+      <div className="flex-1 min-w-0">
         <header className="sticky top-0 z-20 flex items-center justify-between bg-white px-4 py-4 shadow-sm lg:px-6">
           <div className="flex items-center gap-4">
             <button
@@ -515,6 +582,7 @@ export default function CustomerPage() {
             </button>
             <h1 className="text-xl font-semibold hidden sm:block">Pelanggan</h1>
           </div>
+
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" className="hidden sm:flex">
               <Bell className="h-5 w-5" />
@@ -537,10 +605,7 @@ export default function CustomerPage() {
               <DropdownMenuContent align="end">
                 <DropdownMenuItem>Profile</DropdownMenuItem>
                 <DropdownMenuItem>Settings</DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={handleLogout}
-                  className="text-red-600"
-                >
+                <DropdownMenuItem onClick={handleLogout} className="text-red-600">
                   <LogOut className="mr-2 h-4 w-4" />
                   Logout
                 </DropdownMenuItem>
@@ -549,79 +614,92 @@ export default function CustomerPage() {
           </div>
         </header>
 
-        <main className="flex-1 p-2 md:p-6 overflow-x-auto">
+        <main className="p-4 lg:p-6">
           <div className="mb-4">
-            <h2 className="text-lg md:text-xl font-semibold">Pelanggan</h2>
-            <p className="text-xs md:text-sm text-gray-500">Master - Pelanggan</p>
+            <h2 className="text-xl font-semibold">Pelanggan</h2>
+            <p className="text-sm text-gray-500">Master - Pelanggan</p>
           </div>
 
-          <div className="rounded-lg bg-white p-2 md:p-6 shadow-sm overflow-x-auto">
-            <div className="mb-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Select
-                  value={perPage}
-                  onValueChange={(value) => {
-                    setPerPage(value)
-                    setCurrentPage(1)
-                  }}
-                >
-                  <SelectTrigger className="w-16">
-                    <SelectValue placeholder="10" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="10">10</SelectItem>
-                    <SelectItem value="25">25</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                    <SelectItem value="100">100</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-                <div className="relative w-full sm:w-auto">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                  <Input
-                    type="search"
-                    placeholder="Search"
-                    className="w-full sm:w-64 pl-9"
-                    value={searchQuery}
-                    onChange={(e) => {
-                      setSearchQuery(e.target.value)
+          <div className="rounded-lg bg-white p-4 lg:p-6 shadow-sm">
+            {/* Action buttons - Mobile responsive */}
+            <div className="mb-4 space-y-4 lg:space-y-0">
+              <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={perPage}
+                    onValueChange={(value) => {
+                      setPerPage(value)
                       setCurrentPage(1)
                     }}
-                  />
+                  >
+                    <SelectTrigger className="w-16">
+                      <SelectValue placeholder="10" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="25">25</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="flex items-center gap-1">
-                      <ChevronDown className="h-4 w-4" />
-                      Import Data
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="relative w-full sm:w-64">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                    <Input
+                      type="search"
+                      placeholder="Search"
+                      className="w-full pl-9"
+                      value={searchQuery}
+                      onChange={(e) => {
+                        setSearchQuery(e.target.value)
+                        setCurrentPage(1)
+                      }}
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button 
+                          variant="outline" 
+                          className="flex items-center gap-1 flex-1 sm:flex-none"
+                        >
+                          <span className="hidden sm:inline">Import Data</span>
+                          <span className="sm:hidden">Import</span>
+                          <ChevronDown className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={handleOpenImportDialog}>Import Data</DropdownMenuItem>
+                        <DropdownMenuItem onClick={downloadTemplate}>Export Template</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    {/* Moved delete button here */}
+                    {anySelected && (
+                      <Button
+                        variant="destructive"
+                        className="flex items-center justify-center gap-1 flex-1 sm:flex-none"
+                        onClick={() => setShowDeleteDialog(true)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        <span className="hidden sm:inline">Hapus terpilih</span>
+                        <span className="sm:hidden">Hapus</span>
+                      </Button>
+                    )}
+
+                    <Button 
+                      className="bg-green-600 hover:bg-green-700 flex items-center gap-1 flex-1 sm:flex-none"
+                      onClick={handleOpenAddDialog}
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span className="hidden sm:inline">Buat Baru</span>
+                      <span className="sm:hidden">Tambah</span>
                     </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    <DropdownMenuItem onClick={handleOpenEditDialog}>Import Data</DropdownMenuItem>
-                    <DropdownMenuItem onClick={downloadTemplate}>Export Data</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-
-                {anySelected && (
-                  <Button
-                    variant="destructive"
-                    className="flex items-center gap-1"
-                    onClick={() => setShowDeleteDialog(true)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    <span className="hidden sm:inline">Hapus terpilih</span>
-                    <span className="sm:hidden">Hapus</span>
-                  </Button>
-                )}
-
-                <Button className="bg-green-600 hover:bg-green-700" onClick={handleOpenAddDialog}>
-                  <Plus className="mr-1 h-4 w-4" />
-                  <span className="hidden sm:inline">Buat Baru</span>
-                  <span className="sm:hidden">Tambah</span>
-                </Button>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -631,8 +709,8 @@ export default function CustomerPage() {
               </Alert>
             )}
 
-            <div className="overflow-x-auto">
-              <Table className="min-w-[600px] md:min-w-0">
+            <div className="overflow-hidden rounded-md border">
+              <Table>
                 <TableHeader className="bg-gray-50">
                   <TableRow className="hover:bg-gray-50">
                     <TableHead className="w-12 p-4">
@@ -641,13 +719,15 @@ export default function CustomerPage() {
                     <TableHead className="p-4">Kode</TableHead>
                     <TableHead className="p-4">Nama</TableHead>
                     <TableHead className="p-4">No. HP</TableHead>
+                    <TableHead className="p-4">Email</TableHead>
+                    <TableHead className="p-4">Alamat</TableHead>
                     <TableHead className="w-24 p-4 text-right">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="h-24 text-center">
+                      <TableCell colSpan={7} className="h-24 text-center">
                         Loading...
                       </TableCell>
                     </TableRow>
@@ -666,6 +746,8 @@ export default function CustomerPage() {
                         <TableCell className="p-4 border-t border-gray-100">{customer.code}</TableCell>
                         <TableCell className="p-4 border-t border-gray-100">{customer.name}</TableCell>
                         <TableCell className="p-4 border-t border-gray-100">{customer.phone}</TableCell>
+                        <TableCell className="p-4 border-t border-gray-100">{customer.email}</TableCell>
+                        <TableCell className="p-4 border-t border-gray-100">{customer.address}</TableCell>
                         <TableCell className="p-4 border-t border-gray-100">
                           <div className="flex justify-end gap-2">
                             <Button
@@ -706,7 +788,7 @@ export default function CustomerPage() {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={5} className="h-24 text-center">
+                      <TableCell colSpan={7} className="h-24 text-center">
                         Tidak ada data yang ditemukan
                       </TableCell>
                     </TableRow>
@@ -715,13 +797,12 @@ export default function CustomerPage() {
               </Table>
             </div>
 
-            {/* Pagination */}
             {paginationMeta && (
-              <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+              <div className="mt-4 flex items-center justify-between">
                 <div className="text-sm text-gray-500">
                   Page {paginationMeta.from} to {paginationMeta.to} of {paginationMeta.total} entries
                 </div>
-                <div className="flex items-center gap-1 flex-wrap">
+                <div className="flex items-center gap-1">
                   <Button
                     variant="outline"
                     size="sm"
@@ -730,6 +811,7 @@ export default function CustomerPage() {
                   >
                     Previous
                   </Button>
+
                   {Array.from({ length: Math.min(3, paginationMeta.last_page) }, (_, i) => i + 1).map((page) => (
                     <Button
                       key={page}
@@ -741,6 +823,7 @@ export default function CustomerPage() {
                       {page}
                     </Button>
                   ))}
+
                   {paginationMeta.last_page > 3 && (
                     <Button
                       variant={currentPage === 2 ? "default" : "outline"}
@@ -751,6 +834,7 @@ export default function CustomerPage() {
                       2
                     </Button>
                   )}
+
                   <Button
                     variant="outline"
                     size="sm"
@@ -768,19 +852,29 @@ export default function CustomerPage() {
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader className="flex flex-col items-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100 mb-4">
-              <AlertCircle className="h-6 w-6 text-red-600" />
+        <DialogContent className="fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] w-[calc(100%-2rem)] sm:w-full max-w-md rounded-lg bg-white p-4 shadow-lg sm:p-6">
+          <DialogHeader className="flex flex-col items-center space-y-2">
+            <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-red-100">
+              <AlertCircle className="h-5 w-5 sm:h-6 sm:w-6 text-red-600" />
             </div>
-            <DialogTitle className="text-center text-xl">Hapus</DialogTitle>
+            <DialogTitle className="text-base sm:text-lg font-semibold">Hapus</DialogTitle>
           </DialogHeader>
-          <DialogDescription className="text-center py-2">{getConfirmationMessage()}</DialogDescription>
-          <DialogFooter className="flex justify-center gap-2 sm:justify-center">
-            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
+          <DialogDescription className="text-center text-sm py-2">
+            {getConfirmationMessage()}
+          </DialogDescription>
+          <DialogFooter className="flex justify-center gap-2 pt-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowDeleteDialog(false)}
+              className="h-9 px-4 text-sm"
+            >
               Batal
             </Button>
-            <Button variant="destructive" onClick={deleteSelected}>
+            <Button 
+              variant="destructive" 
+              onClick={deleteSelected}
+              className="h-9 px-4 text-sm"
+            >
               Hapus
             </Button>
           </DialogFooter>
@@ -789,53 +883,47 @@ export default function CustomerPage() {
 
       {/* Add Customer Dialog */}
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent className="max-w-full sm:max-w-md w-full max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Tambah Pelanggan</DialogTitle>
+        <DialogContent className="w-[calc(100%-2rem)] sm:max-w-2xl max-h-[90vh] overflow-y-auto fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] rounded-lg bg-white p-4 sm:p-6 shadow-lg">
+          <DialogHeader className="space-y-2">
+            <DialogTitle className="text-base sm:text-lg font-semibold">Tambah Pelanggan</DialogTitle>
           </DialogHeader>
           <div className="py-4">
             <div className="space-y-4">
               {/* Profile Photo Input */}
               <div className="space-y-2">
                 <Label htmlFor="customer-photo">Foto Profil (Opsional)</Label>
-                <div className="flex flex-col items-start gap-2">
-                  <div className="flex items-center gap-4">
-                    <div className="h-20 w-20 flex items-center justify-center rounded-full bg-gray-200">
-                      {newCustomerPhoto ? (
-                        <img
-                          src={URL.createObjectURL(newCustomerPhoto)}
-                          alt="Preview"
-                          className="h-full w-full rounded-full object-cover"
-                        />
-                      ) : (
-                        <svg width="48" height="48" fill="none" viewBox="0 0 24 24">
-                          <circle cx="12" cy="12" r="12" fill="#e5e7eb"/>
-                          <path d="M8 12a4 4 0 1 1 8 0 4 4 0 0 1-8 0Zm-2 6a6 6 0 0 1 12 0H6Z" fill="#9ca3af"/>
-                        </svg>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex w-full items-center gap-2">
-                    <label className="inline-block">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          if (e.target.files?.[0]) {
-                            setNewCustomerPhoto(e.target.files[0])
-                            setPhotoError("")
-                          }
-                        }}
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                  {newCustomerPhoto && (
+                    <div className="relative h-20 w-20">
+                      <img
+                        src={URL.createObjectURL(newCustomerPhoto)}
+                        alt="Preview"
+                        className="h-full w-full rounded-full object-cover"
                       />
-                      <Button asChild variant="outline" size="sm">
-                        <span>Choose File</span>
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        className="absolute -right-2 -top-2 h-6 w-6"
+                        onClick={() => setNewCustomerPhoto(null)}
+                      >
+                        <X className="h-4 w-4" />
                       </Button>
-                    </label>
-                    <span className="text-sm text-gray-700">
-                      {newCustomerPhoto ? newCustomerPhoto.name : "Tidak ada file dipilih"}
-                    </span>
-                  </div>
+                    </div>
+                  )}
+                  <label className="cursor-pointer rounded-md border bg-gray-100 px-4 py-2 text-sm hover:bg-gray-200 w-full sm:w-auto text-center">
+                    Pilih Foto
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files?.[0]) {
+                          setNewCustomerPhoto(e.target.files[0])
+                          setPhotoError("")
+                        }
+                      }}
+                    />
+                  </label>
                 </div>
                 {photoError && (
                   <Alert variant="destructive" className="py-2 mt-2">
@@ -844,77 +932,84 @@ export default function CustomerPage() {
                 )}
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="customer-code">Kode</Label>
-                <Input
-                  id="customer-code"
-                  value={newCustomerCode}
-                  onChange={(e) => {
-                    setNewCustomerCode(e.target.value)
-                    setCodeError("")
-                  }}
-                  placeholder="Masukkan kode pelanggan"
-                />
-                {codeError && (
-                  <Alert variant="destructive" className="py-2 mt-2">
-                    <AlertDescription className="text-sm">{codeError}</AlertDescription>
-                  </Alert>
-                )}
-              </div>
+              {/* Other form fields */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="customer-code">Kode</Label>
+                  <Input
+                    id="customer-code"
+                    value={newCustomerCode}
+                    onChange={(e) => {
+                      setNewCustomerCode(e.target.value)
+                      setCodeError("")
+                    }}
+                    placeholder="Masukkan kode pelanggan"
+                    className="w-full"
+                  />
+                  {codeError && (
+                    <Alert variant="destructive" className="py-2 mt-2">
+                      <AlertDescription className="text-sm">{codeError}</AlertDescription>
+                    </Alert>
+                  )}
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="customer-name">Nama</Label>
-                <Input
-                  id="customer-name"
-                  value={newCustomerName}
-                  onChange={(e) => {
-                    setNewCustomerName(e.target.value)
-                    setNameError("")
-                  }}
-                  placeholder="Masukkan nama pelanggan"
-                />
-                {nameError && (
-                  <Alert variant="destructive" className="py-2 mt-2">
-                    <AlertDescription className="text-sm">{nameError}</AlertDescription>
-                  </Alert>
-                )}
-              </div>
+                <div className="space-y-2">
+                  <Label htmlFor="customer-name">Nama</Label>
+                  <Input
+                    id="customer-name"
+                    value={newCustomerName}
+                    onChange={(e) => {
+                      setNewCustomerName(e.target.value)
+                      setNameError("")
+                    }}
+                    placeholder="Masukkan nama pelanggan"
+                    className="w-full"
+                  />
+                  {nameError && (
+                    <Alert variant="destructive" className="py-2 mt-2">
+                      <AlertDescription className="text-sm">{nameError}</AlertDescription>
+                    </Alert>
+                  )}
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="customer-email">Email (Opsional)</Label>
-                <Input
-                  id="customer-email"
-                  type="email"
-                  value={newCustomerEmail}
-                  onChange={(e) => {
-                    setNewCustomerEmail(e.target.value)
-                    setEmailError("")
-                  }}
-                  placeholder="Masukkan email pelanggan"
-                />
-                {emailError && (
-                  <Alert variant="destructive" className="py-2 mt-2">
-                    <AlertDescription className="text-sm">{emailError}</AlertDescription>
-                  </Alert>
-                )}
-              </div>
+                <div className="space-y-2">
+                  <Label htmlFor="customer-email">Email (Opsional)</Label>
+                  <Input
+                    id="customer-email"
+                    type="email"
+                    value={newCustomerEmail}
+                    onChange={(e) => {
+                      setNewCustomerEmail(e.target.value)
+                      setEmailError("")
+                    }}
+                    placeholder="Masukkan email pelanggan"
+                    className="w-full"
+                  />
+                  {emailError && (
+                    <Alert variant="destructive" className="py-2 mt-2">
+                      <AlertDescription className="text-sm">{emailError}</AlertDescription>
+                    </Alert>
+                  )}
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="customer-phone">No. HP</Label>
-                <Input
-                  id="customer-phone"
-                  value={newCustomerPhone}
-                  onChange={(e) => {
-                    setNewCustomerPhone(e.target.value)
-                    setPhoneError("")
-                  }}
-                  placeholder="Masukkan nomor HP pelanggan"
-                />
-                {phoneError && (
-                  <Alert variant="destructive" className="py-2 mt-2">
-                    <AlertDescription className="text-sm">{phoneError}</AlertDescription>
-                  </Alert>
-                )}
+                <div className="space-y-2">
+                  <Label htmlFor="customer-phone">No. HP</Label>
+                  <Input
+                    id="customer-phone"
+                    value={newCustomerPhone}
+                    onChange={(e) => {
+                      setNewCustomerPhone(e.target.value)
+                      setPhoneError("")
+                    }}
+                    placeholder="Masukkan nomor HP pelanggan"
+                    className="w-full"
+                  />
+                  {phoneError && (
+                    <Alert variant="destructive" className="py-2 mt-2">
+                      <AlertDescription className="text-sm">{phoneError}</AlertDescription>
+                    </Alert>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -927,6 +1022,7 @@ export default function CustomerPage() {
                     setAddressError("")
                   }}
                   placeholder="Masukkan alamat pelanggan"
+                  className="w-full"
                 />
                 {addressError && (
                   <Alert variant="destructive" className="py-2 mt-2">
@@ -945,6 +1041,7 @@ export default function CustomerPage() {
                     setNotesError("")
                   }}
                   placeholder="Masukkan keterangan pelanggan"
+                  className="w-full"
                 />
                 {notesError && (
                   <Alert variant="destructive" className="py-2 mt-2">
@@ -954,11 +1051,11 @@ export default function CustomerPage() {
               </div>
             </div>
           </div>
-          <DialogFooter className="sm:justify-end">
-            <DialogClose asChild>
-              <Button variant="outline">Batal</Button>
-            </DialogClose>
-            <Button onClick={addCustomer} className="bg-green-600 hover:bg-green-700">
+          <DialogFooter className="flex flex-col sm:flex-row gap-2 pt-4">
+            <Button variant="outline" onClick={() => setShowAddDialog(false)} className="w-full sm:w-auto">
+              Batal
+            </Button>
+            <Button onClick={addCustomer} className="w-full sm:w-auto bg-green-600 hover:bg-green-700">
               Tambah
             </Button>
           </DialogFooter>
@@ -967,56 +1064,12 @@ export default function CustomerPage() {
 
       {/* Edit Customer Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="max-w-full sm:max-w-md w-full max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Edit Pelanggan</DialogTitle>
+        <DialogContent className="w-[calc(100%-2rem)] sm:max-w-md max-h-[90vh] overflow-y-auto fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] rounded-lg bg-white p-4 sm:p-6 shadow-lg">
+          <DialogHeader className="space-y-2">
+            <DialogTitle className="text-base sm:text-lg font-semibold">Edit Pelanggan</DialogTitle>
           </DialogHeader>
           <div className="py-4">
             <div className="space-y-4">
-              {/* Profile Photo Input */}
-              <div className="space-y-2">
-                <Label htmlFor="edit-customer-photo">Foto Profil (Opsional)</Label>
-                <div className="flex flex-col items-start gap-2">
-                  <div className="flex items-center gap-4">
-                    <div className="h-20 w-20 flex items-center justify-center rounded-full bg-gray-200">
-                      {editCustomerPhoto ? (
-                        <img
-                          src={URL.createObjectURL(editCustomerPhoto)}
-                          alt="Preview"
-                          className="h-full w-full rounded-full object-cover"
-                        />
-                      ) : (
-                        // Ganti src berikut dengan icon/image default kamu jika ada
-                        <svg width="48" height="48" fill="none" viewBox="0 0 24 24">
-                          <circle cx="12" cy="12" r="12" fill="#e5e7eb"/>
-                          <path d="M8 12a4 4 0 1 1 8 0 4 4 0 0 1-8 0Zm-2 6a6 6 0 0 1 12 0H6Z" fill="#9ca3af"/>
-                        </svg>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex w-full items-center gap-2">
-                    <label className="inline-block">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          if (e.target.files?.[0]) {
-                            setEditCustomerPhoto(e.target.files[0])
-                          }
-                        }}
-                      />
-                      <Button asChild variant="outline" size="sm">
-                        <span>Choose File</span>
-                      </Button>
-                    </label>
-                    <span className="text-sm text-gray-700">
-                      {editCustomerPhoto ? editCustomerPhoto.name : "Tidak ada file dipilih"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
               <div className="space-y-2">
                 <Label htmlFor="edit-customer-code">Kode</Label>
                 <Input
@@ -1027,6 +1080,7 @@ export default function CustomerPage() {
                     setEditCodeError("")
                   }}
                   placeholder="Masukkan kode pelanggan"
+                  className="w-full"
                 />
                 {editCodeError && (
                   <Alert variant="destructive" className="py-2 mt-2">
@@ -1045,23 +1099,13 @@ export default function CustomerPage() {
                     setEditNameError("")
                   }}
                   placeholder="Masukkan nama pelanggan"
+                  className="w-full"
                 />
                 {editNameError && (
                   <Alert variant="destructive" className="py-2 mt-2">
                     <AlertDescription className="text-sm">{editNameError}</AlertDescription>
                   </Alert>
                 )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="edit-customer-email">Email</Label>
-                <Input
-                  id="edit-customer-email"
-                  type="email"
-                  value={editCustomerEmail}
-                  onChange={(e) => setEditCustomerEmail(e.target.value)}
-                  placeholder="Masukkan email pelanggan"
-                />
               </div>
 
               <div className="space-y-2">
@@ -1074,6 +1118,7 @@ export default function CustomerPage() {
                     setEditPhoneError("")
                   }}
                   placeholder="Masukkan nomor HP pelanggan"
+                  className="w-full"
                 />
                 {editPhoneError && (
                   <Alert variant="destructive" className="py-2 mt-2">
@@ -1081,33 +1126,13 @@ export default function CustomerPage() {
                   </Alert>
                 )}
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="edit-customer-address">Alamat</Label>
-                <Input
-                  id="edit-customer-address"
-                  value={editCustomerAddress}
-                  onChange={(e) => setEditCustomerAddress(e.target.value)}
-                  placeholder="Masukkan alamat pelanggan"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="edit-customer-notes">Keterangan</Label>
-                <Input
-                  id="edit-customer-notes"
-                  value={editCustomerNotes}
-                  onChange={(e) => setEditCustomerNotes(e.target.value)}
-                  placeholder="Masukkan keterangan pelanggan"
-                />
-              </div>
             </div>
           </div>
-          <DialogFooter className="sm:justify-end">
-            <DialogClose asChild>
-              <Button variant="outline">Batal</Button>
-            </DialogClose>
-            <Button onClick={editCustomer} className="bg-green-600 hover:bg-green-700">
+          <DialogFooter className="flex flex-col sm:flex-row gap-2 pt-4">
+            <Button variant="outline" onClick={() => setShowEditDialog(false)} className="w-full sm:w-auto">
+              Batal
+            </Button>
+            <Button onClick={editCustomer} className="w-full sm:w-auto bg-green-600 hover:bg-green-700">
               Simpan
             </Button>
           </DialogFooter>
@@ -1116,75 +1141,75 @@ export default function CustomerPage() {
 
       {/* Import Data Dialog */}
       <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Import Data</DialogTitle>
+        <DialogContent className="w-[calc(100%-2rem)] sm:max-w-md max-h-[90vh] overflow-y-auto fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] rounded-lg bg-white p-4 sm:p-6 shadow-lg">
+          <DialogHeader className="space-y-2">
+            <DialogTitle className="text-base sm:text-lg font-semibold">Import Data</DialogTitle>
           </DialogHeader>
-          <div className="py-4">
-            <div className="space-y-6">
-              <div>
-                <p className="mb-2">
-                  Unduh
-                  <Button
-                    variant="link"
-                    className="p-0 h-auto text-blue-600 hover:underline"
-                    onClick={downloadTemplate}
-                  >
-                    Template
-                  </Button>
-                </p>
-              </div>
+          <div className="py-4 space-y-4">
+            <div>
+              <p className="text-sm mb-2">
+                Unduh{" "}
+                <Button
+                  variant="link"
+                  className="px-0 h-auto text-blue-600 hover:underline text-sm"
+                  onClick={downloadTemplate}
+                >
+                  Template
+                </Button>
+              </p>
+            </div>
 
-              <div>
-                <p className="mb-2">Pilih File</p>
-                <div className="flex items-center gap-2">
-                  <label
-                    htmlFor="file-upload"
-                    className="cursor-pointer rounded-md border bg-gray-100 px-4 py-2 text-sm hover:bg-gray-200"
-                  >
-                    Choose File
-                  </label>
-                  <input
-                    id="file-upload"
-                    type="file"
-                    accept=".csv,.xlsx,.xls"
-                    className="hidden"
-                    onChange={handleFileChange}
-                  />
-                  <span className="text-sm text-gray-500">
-                    {selectedFile ? selectedFile.name : "Tidak Ada File Yang Dipilih"}
-                  </span>
-                </div>
+            <div>
+              <p className="text-sm mb-2">Pilih File</p>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                <label
+                  htmlFor="file-upload"
+                  className="cursor-pointer rounded-md border bg-gray-100 px-4 py-2 text-sm hover:bg-gray-200 w-full sm:w-auto text-center"
+                >
+                  Choose File
+                </label>
+                <input
+                  id="file-upload"
+                  type="file"
+                  accept=".csv,.xlsx,.xls"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+                <span className="text-sm text-gray-500 truncate w-full">
+                  {selectedFile ? selectedFile.name : "Tidak Ada File Yang Dipilih"}
+                </span>
               </div>
             </div>
           </div>
-          <DialogFooter className="flex justify-end gap-2">
-            <Button variant="destructive" onClick={() => setShowImportDialog(false)}>
+          <DialogFooter className="flex flex-col sm:flex-row gap-2 pt-4">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowImportDialog(false)} 
+              className="w-full sm:w-auto"
+            >
               Batal
             </Button>
-            <Button onClick={handleImport} className="bg-green-600 hover:bg-green-700" disabled={!selectedFile}>
+            <Button 
+              onClick={handleImport} 
+              disabled={!selectedFile}
+              className="w-full sm:w-auto bg-green-600 hover:bg-green-700"
+            >
               Import
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Success Dialog */}
-      <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
-        <DialogContent className="max-w-xs text-center">
-          <div className="flex flex-col items-center justify-center py-4">
-            <CheckCircle className="h-12 w-12 text-green-600 mb-2" />
-            <DialogTitle className="text-lg font-bold mt-2 mb-1">SUKSES</DialogTitle>
-            <DialogDescription className="mb-4 text-gray-600">{successMessage}</DialogDescription>
-            <Button
-              className="bg-indigo-600 hover:bg-indigo-700 text-white w-24 mx-auto"
-              onClick={() => setShowSuccessDialog(false)}
-            >
-              Ok
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Success Notification - Add this near the end */}
+      <SuccessNotification
+        message={notification.message}
+        description={notification.description}
+        isVisible={notification.isVisible}
+        onClose={hideSuccess}
+        position="top-4 right-4 left-4 sm:left-auto"
+        duration={5000}
+        className="max-w-[calc(100%-2rem)] sm:max-w-md"
+      />
     </div>
   )
 }

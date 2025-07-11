@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { Bell, ChevronDown, LogOut, User, ArrowLeft } from "lucide-react"
+import { Bell, ChevronDown, LogOut, User, ArrowLeft, Menu } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -12,7 +12,7 @@ import { Sidebar } from "@/components/sidebar"
 import { useAuth } from "@/components/auth-provider"
 import api from "@/lib/api"
 
-interface Customers {
+interface customer {
   id: string
   code: string
   name: string
@@ -32,30 +32,20 @@ interface Transaction {
   description: string
 }
 
-interface Customer {
-  id: string
-  code: string
-  name: string
-  email: string
-  address: string
-  notes: string
-  phone: string
-  registrationDate: string
-}
-
 export default function CustomerDetailPage() {
   const params = useParams()
   const router = useRouter()
   const { userEmail, logout } = useAuth()
-  const [customer, setCustomer] = useState<Customer | null>(null)
+  const [customer, setcustomer] = useState<customer | null>(null)
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [paymentHistory, setPaymentHistory] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [isSidebarOpen, setSidebarOpen] = useState(false)
 
   const customerId = params.id as string
 
-  const fetchCustomerData = async () => {
+  const fetchcustomerData = async () => {
     setLoading(true)
     setError("")
 
@@ -63,22 +53,26 @@ export default function CustomerDetailPage() {
       const auth = JSON.parse(localStorage.getItem("auth") || "{}")
       const companyId = auth.companyId
 
-      // Fetch customer data
+      // Only fetch customer data
       const response = await api.get(`/v1/app/customers/${customerId}`, {
         params: {
           company_id: companyId
         }
       })
 
+      console.log("customer response:", response.data)
+
       if (response.data?.data) {
-        setCustomer(response.data.data)
-        setTransactions([]) // Kosongkan jika belum ada API transaksi
-        setPaymentHistory([]) // Kosongkan jika belum ada API pembayaran
+        setcustomer(response.data.data)
+        // Set empty arrays for transactions and payments since APIs don't exist
+        setTransactions([])
+        setPaymentHistory([])
       } else {
-        setError("Pelanggan tidak ditemukan")
+        setError("customer tidak ditemukan")
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || "Gagal mengambil data pelanggan")
+      console.error("Error fetching customer:", err)
+      setError(err.response?.data?.message || "Gagal mengambil data customer")
     } finally {
       setLoading(false)
     }
@@ -86,7 +80,8 @@ export default function CustomerDetailPage() {
 
   useEffect(() => {
     if (customerId) {
-      fetchCustomerData()
+      console.log("Fetching customer data for ID:", customerId)
+      fetchcustomerData()
     }
   }, [customerId])
 
@@ -121,7 +116,7 @@ export default function CustomerDetailPage() {
         <Sidebar />
         <div className="flex-1">
           <div className="flex flex-col items-center justify-center h-full">
-            <p className="text-red-500 mb-4">{error || "Pelanggan tidak ditemukan"}</p>
+            <p className="text-red-500 mb-4">{error || "customer tidak ditemukan"}</p>
             <Button onClick={handleBack} variant="outline">
               Kembali ke Daftar Pelanggan
             </Button>
@@ -133,11 +128,41 @@ export default function CustomerDetailPage() {
 
   return (
     <div className="flex min-h-screen bg-gray-100">
-      <Sidebar />
-      <div className="flex-1">
-        <header className="flex items-center justify-between bg-white px-6 py-4 shadow-sm">
-          <h1 className="text-2xl font-semibold"></h1>
-          <div className="flex items-center gap-4">
+      {/* Mobile Sidebar Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar with mobile toggle */}
+      <div className={`
+        fixed inset-y-0 left-0 z-50 w-64 bg-white transform transition-transform duration-200 ease-in-out lg:relative lg:transform-none
+        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+      `}>
+        <Sidebar />
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 min-w-0">
+        {/* Header with mobile menu button */}
+        <header className="sticky top-0 z-10 flex items-center justify-between bg-white px-4 sm:px-6 py-3 sm:py-4 shadow-sm">
+          <div className="flex items-center gap-2">
+            {/* Mobile menu button */}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setSidebarOpen(!isSidebarOpen)}
+              className="lg:hidden"
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+            
+            <h1 className="text-lg sm:text-2xl font-semibold"></h1>
+          </div>
+
+          <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon">
               <Bell className="h-5 w-5" />
             </Button>
@@ -147,7 +172,7 @@ export default function CustomerDetailPage() {
                   <Avatar className="h-8 w-8">
                     <AvatarFallback>{userEmail ? userEmail[0].toUpperCase() : "U"}</AvatarFallback>
                   </Avatar>
-                  <span>{userEmail ? userEmail.split("@")[0] : "User"}</span>
+                  <span className="hidden sm:inline">{userEmail ? userEmail.split("@")[0] : "User"}</span>
                   <ChevronDown className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -166,63 +191,72 @@ export default function CustomerDetailPage() {
           </div>
         </header>
 
-        <main className="p-6">
+        {/* Main content with responsive padding */}
+        <main className="p-4 sm:p-6">
+          {/* Breadcrumb */}
           <div className="mb-4">
-            <h2 className="text-xl font-semibold">Pelanggan</h2>
-            <p className="text-sm text-gray-500">Master - Pelanggan</p>
+            <h2 className="text-lg sm:text-xl font-semibold">Pelanggan</h2>
+            <p className="text-xs sm:text-sm text-gray-500">
+              Master - Pelanggan
+              <span className="text-red-500 font-medium">
+                {customer ? ` - ${customer.name}` : ""}
+              </span>
+            </p>
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-2">
-            {/* Customer Information Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-3">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-gray-100">
-                    <User className="h-8 w-8 text-gray-400" />
+          {/* Responsive card layout */}
+          <div className="flex flex-col lg:flex-row gap-4 lg:gap-8">
+            {/* customer Card - Full width on mobile */}
+            <Card className="w-full lg:w-[350px] border-2 border-blue-400">
+              <CardContent className="pt-8 flex flex-col items-center">
+                <div className="text-xl font-semibold mb-1">{customer.name}</div>
+                <div className="text-base mb-3">{customer.code}</div>
+                <div className="mb-4">
+                  <div className="rounded-full bg-gray-200 w-16 h-16 flex items-center justify-center">
+                    <User className="w-8 h-8 text-gray-500" />
                   </div>
-                  <div>
-                    <h2 className="text-xl font-bold">{customer.name}</h2>
-                    <p className="text-sm text-gray-500">{customer.code}</p>
+                </div>
+                <div className="w-full text-sm">
+                  <div className="flex mb-1">
+                    <div className="w-28">Tipe</div>
+                    <div className="w-2">:</div>
+                    <div>{customer.type || "-"}</div>
                   </div>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div className="rounded-lg border p-2.5">
-                    <span className="text-gray-600 text-xs">Email</span>
-                    <p className="mt-0.5 font-medium truncate">{customer.email}</p>
+                  <div className="flex mb-1">
+                    <div className="w-28">Email</div>
+                    <div className="w-2">:</div>
+                    <div>{customer.email || "-"}</div>
                   </div>
-                  <div className="rounded-lg border p-2.5">
-                    <span className="text-gray-600 text-xs">No. HP</span>
-                    <p className="mt-0.5 font-medium">{customer.phone}</p>
+                  <div className="flex mb-1">
+                    <div className="w-28">Alamat</div>
+                    <div className="w-2">:</div>
+                    <div>{customer.address || "-"}</div>
                   </div>
-                  <div className="rounded-lg border p-2.5">
-                    <span className="text-gray-600 text-xs">Alamat</span>
-                    <p className="mt-0.5 font-medium truncate">{customer.address}</p>
+                  <div className="flex mb-1">
+                    <div className="w-28">Keterangan</div>
+                    <div className="w-2">:</div>
+                    <div>{customer.notes || "-"}</div>
                   </div>
-                  <div className="rounded-lg border p-2.5">
-                    <span className="text-gray-600 text-xs">Keterangan</span>
-                    <p className="mt-0.5 font-medium truncate">{customer.notes || "-"}</p>
-                  </div>
-                  <div className="rounded-lg border p-2.5">
-                    <span className="text-gray-600 text-xs">Tgl Bergabung</span>
-                    <p className="mt-0.5 font-medium">{customer.registrationDate}</p>
+                  <div className="flex mb-1">
+                    <div className="w-28">Tgl Bergabung</div>
+                    <div className="w-2">:</div>
+                    <div>{customer.registrationDate || "-"}</div>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Transaction History */}
-            <Card>
-              <CardContent className="p-0">
+            {/* Tabs - Full width on mobile */}
+            <div className="flex-1 min-w-0">
+              <div className="rounded-lg bg-white shadow p-4">
                 <Tabs defaultValue="transactions" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2">
+                  <TabsList className="w-full grid grid-cols-2">
                     <TabsTrigger value="transactions">Transaksi</TabsTrigger>
                     <TabsTrigger value="payments">Riwayat Pembayaran</TabsTrigger>
                   </TabsList>
-                  <TabsContent value="transactions" className="p-6">
+                  <TabsContent value="transactions">
                     {transactions.length === 0 ? (
-                      <div className="flex h-32 items-center justify-center text-gray-500">
+                      <div className="border mt-2 rounded text-center py-4 text-sm text-gray-500">
                         Tidak Ada Riwayat Transaksi
                       </div>
                     ) : (
@@ -242,9 +276,9 @@ export default function CustomerDetailPage() {
                       </div>
                     )}
                   </TabsContent>
-                  <TabsContent value="payments" className="p-6">
+                  <TabsContent value="payments">
                     {paymentHistory.length === 0 ? (
-                      <div className="flex h-32 items-center justify-center text-gray-500">
+                      <div className="border mt-2 rounded text-center py-4 text-sm text-gray-500">
                         Tidak Ada Riwayat Pembayaran
                       </div>
                     ) : (
@@ -265,8 +299,8 @@ export default function CustomerDetailPage() {
                     )}
                   </TabsContent>
                 </Tabs>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
         </main>
       </div>
